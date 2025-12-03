@@ -1,0 +1,33 @@
+# ---------- Python ----------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual envs
+.venv/
+env/
+venv/
+
+# ---------- IDE / OS ----------
+.idea/
+.vscode/
+.DS_Store
+
+# ---------- Local config / secrets (if you add later) ----------
+.env
+
+# ---------- Caches / misc ----------
+*.log
+.cache/
+
+# ---------- Project-specific: data & artifacts ----------
+
+# Raw EntailmentBank + any other large datasets
+data/entailmentbank_raw/
+
+# Any derived EB splits you create
+data/eb_task1_dev_*.jsonl
+
+# All experiment outputs (candidates, scores, sets, metrics, etc.)
+outputs/
