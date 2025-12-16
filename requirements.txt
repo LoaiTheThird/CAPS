@@ -2,3 +2,5 @@ clingo
 pydantic[dotenv]
 orjson
 vllm
+torch
+tqdm
