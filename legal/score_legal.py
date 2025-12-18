@@ -169,7 +169,20 @@ def main() -> None:
             model=args.ollama_model,
             timeout_s=args.timeout_s,
         )
-        q = clamp01(jr.q)
+        # Use rubric mean as the primary continuous quality score (more stable than jr.q)
+        rub = jr.rubric or {}
+        vals = [
+            float(rub.get("issue", 0.0)),
+            float(rub.get("rule", 0.0)),
+            float(rub.get("application", 0.0)),
+            float(rub.get("coherence", 0.0)),
+        ]
+        q_rubric = clamp01(sum(vals) / 4.0)
+
+        # (Optional) still keep the model's self-reported q, but don't rely on it
+        # q_model = clamp01(jr.q)
+
+        q = q_rubric
 
         # Mix correctness into q if available (keeps q continuous)
         if mix > 0.0 and correct is not None:
@@ -194,6 +207,7 @@ def main() -> None:
                 "model": args.ollama_model,
                 "verdict": jr.verdict,
                 "notes": jr.notes,
+                "q_source": "rubric_mean",
             },
         )
 
