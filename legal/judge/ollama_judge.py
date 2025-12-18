@@ -1,6 +1,10 @@
 # legal/judge/ollama_judge.py
 from __future__ import annotations
 
+import urllib.request
+import urllib.error
+
+
 import json
 import re
 import subprocess
@@ -28,31 +32,41 @@ def _clamp01(x: float) -> float:
     return x
 
 
-def _safe_float(v: Any, default: float = 0.0) -> float:
-    try:
-        return float(v)
-    except Exception:
-        return default
-
-
 def _extract_json(text: str) -> Optional[Dict[str, Any]]:
-    """
-    Extract the first JSON object from text and parse it.
-    Many local models sometimes add pre/post text; this tolerates that.
-    """
-    m = _JSON_RE.search(text)
-    if not m:
+    t = (text or "").strip()
+
+    # take first non-empty line
+    line = next((ln.strip() for ln in t.splitlines() if ln.strip()), "")
+    if not line:
         return None
-    blob = m.group(0)
+
+    # remove any stray backticks if they appear
+    line = line.replace("```json", "").replace("```", "").strip()
+
+    # must start with '{'
+    if not line.startswith("{"):
+        return None
+
     try:
-        return json.loads(blob)
+        return json.loads(line)
     except Exception:
         return None
 
 
+# Prev version:
 # def call_ollama(prompt: str, model: str, timeout_s: int) -> str:
+#     cmd = [
+#         "ollama", "run", model,
+#         "-o", "temperature=0",
+#         "-o", "num_predict=256",
+#         "-o", "top_p=0.9",
+#         # stop tokens (best effort; some models still ignore)
+#         "-o", "stop=}\n",
+#         "-o", "stop=}\r\n",
+#     ]
+#
 #     proc = subprocess.run(
-#         ["ollama", "run", model],
+#         cmd,
 #         input=prompt,
 #         text=True,
 #         capture_output=True,
@@ -62,31 +76,52 @@ def _extract_json(text: str) -> Optional[Dict[str, Any]]:
 #         raise RuntimeError(f"Ollama failed (rc={proc.returncode}): {proc.stderr.strip()}")
 #     return proc.stdout.strip()
 
-def call_ollama(prompt: str, model: str, timeout_s: int) -> str:
-    cmd = [
-        "ollama", "run", model,
-        "-o", "temperature=0",
-        "-o", "num_predict=256",
-        "-o", "top_p=0.9",
-        # stop tokens (best effort; some models still ignore)
-        "-o", "stop=}\n",
-        "-o", "stop=}\r\n",
-    ]
 
-    proc = subprocess.run(
-        cmd,
-        input=prompt,
-        text=True,
-        capture_output=True,
-        timeout=timeout_s,
+def call_ollama(prompt: str, model: str, timeout_s: int) -> str:
+    """
+    Call local Ollama server via HTTP API.
+    This supports options (num_predict, temperature, stop, etc.) reliably.
+    """
+    url = "http://localhost:11434/api/generate"
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0.0,
+            "num_predict": 256,
+            "top_p": 0.9,
+            "stop": ["\n"],
+        },
+    }
+
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
     )
-    if proc.returncode != 0:
-        raise RuntimeError(f"Ollama failed (rc={proc.returncode}): {proc.stderr.strip()}")
-    return proc.stdout.strip()
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            out = resp.read().decode("utf-8")
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Ollama HTTP call failed: {e}") from e
+
+    obj = json.loads(out)
+    return (obj.get("response") or "").strip()
 
 
 def load_template(path: Path) -> Optional[str]:
     return path.read_text() if path.exists() else None
+
+
+def _safe_float(v: Any, default: float = 0.0) -> float:
+    try:
+        return float(v)
+    except Exception:
+        return default
 
 
 def judge_trace_with_ollama(

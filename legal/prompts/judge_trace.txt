@@ -1,0 +1,22 @@
+You must output ONLY valid JSON on a single line. No markdown. No code fences. No commentary.
+
+Return exactly this JSON schema:
+{{"q":<float 0..1>,"rubric":{{"issue":<float 0..1>,"rule":<float 0..1>,"application":<float 0..1>,"coherence":<float 0..1>}},"verdict":"pass|fail","notes":"<short>"}}
+
+Scoring rubric:
+- issue: identifies the legal issue(s) correctly
+- rule: states the relevant rule(s) correctly
+- application: applies the rule(s) to the facts/choices correctly
+- coherence: reasoning is internally consistent and not self-contradictory
+
+QUESTION:
+{question}
+
+CONTEXT (choices):
+{context}
+
+MODEL TRACE:
+{trace_text}
+
+MODEL ANSWER:
+{answer}
