@@ -103,20 +103,48 @@ def heuristic_generate(
     return answer, "\n".join(trace_lines)
 
 
+# def ollama_generate_once(
+#     prompt: str,
+#     model: str,
+#     timeout_s: int = 180,
+# ) -> str:
+#     """
+#     Calls local Ollama (free) via CLI:
+#       ollama run <model>
+#     with prompt via stdin.
+#
+#     Requires: `ollama` installed + model pulled.
+#     """
+#     proc = subprocess.run(
+#         ["ollama", "run", model],
+#         input=prompt,
+#         text=True,
+#         capture_output=True,
+#         timeout=timeout_s,
+#     )
+#     if proc.returncode != 0:
+#         raise RuntimeError(f"Ollama failed (rc={proc.returncode}): {proc.stderr.strip()}")
+#     return proc.stdout.strip()
+
 def ollama_generate_once(
     prompt: str,
     model: str,
     timeout_s: int = 180,
 ) -> str:
     """
-    Calls local Ollama (free) via CLI:
-      ollama run <model>
-    with prompt via stdin.
-
-    Requires: `ollama` installed + model pulled.
+    Calls local Ollama with hard caps so generation can't ramble forever.
     """
+    cmd = [
+        "ollama", "run", model,
+        "-o", "temperature=0.7",
+        "-o", "num_predict=256",   # cap output tokens
+        "-o", "top_p=0.9",
+        "-o", "stop=Answer:",
+        "-o", "stop=ANSWER:",
+    ]
+
     proc = subprocess.run(
-        ["ollama", "run", model],
+        cmd,
         input=prompt,
         text=True,
         capture_output=True,
@@ -147,23 +175,17 @@ def build_prompt(
         )
 
     # Fallback built-in template
-    return f"""You are a careful legal reasoning assistant.
-Task: choose the best answer among [{", ".join(CHOICE_LABELS)}] and give step-by-step reasoning.
+    return f"""Choose the best answer among [A,B,C,D].
 
-STYLE: {style}
+    QUESTION:
+    {ex.question}
 
-QUESTION:
-{ex.question}
+    {choice_block}
 
-{choice_block}
-
-Output format (must follow exactly):
-Reasoning:
-1) ...
-2) ...
-3) ...
-Answer: <one letter among {", ".join(CHOICE_LABELS)}>
-"""
+    Write:
+    Reasoning: (max 5 short bullet points)
+    Answer: <A|B|C|D>
+    """
 
 
 def parse_ollama_output_to_trace(out: str) -> Tuple[str, str]:

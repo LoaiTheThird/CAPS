@@ -31,3 +31,5 @@ data/eb_task1_dev_*.jsonl
 
 # All experiment outputs (candidates, scores, sets, metrics, etc.)
 outputs/
+
+data/lexam_repo/
