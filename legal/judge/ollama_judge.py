@@ -181,15 +181,33 @@ def judge_trace_with_ollama(
         if obj is None:
             continue
 
-        q = _clamp01(_safe_float(obj.get("q", 0.0), 0.0))
+        q_raw = _safe_float(obj.get("q", 0.0), 0.0)
         rubric_in = obj.get("rubric", {}) or {}
 
-        rubric = {
-            "issue": _clamp01(_safe_float(rubric_in.get("issue", 0.0), 0.0)),
-            "rule": _clamp01(_safe_float(rubric_in.get("rule", 0.0), 0.0)),
-            "application": _clamp01(_safe_float(rubric_in.get("application", 0.0), 0.0)),
-            "coherence": _clamp01(_safe_float(rubric_in.get("coherence", 0.0), 0.0)),
-        }
+        issue_raw = _safe_float(rubric_in.get("issue", 0.0), 0.0)
+        rule_raw = _safe_float(rubric_in.get("rule", 0.0), 0.0)
+        app_raw = _safe_float(rubric_in.get("application", 0.0), 0.0)
+        coh_raw = _safe_float(rubric_in.get("coherence", 0.0), 0.0)
+
+        # If any value > 1, assume the judge is using 0..100 integers
+        uses_100 = any(v > 1.0 for v in [q_raw, issue_raw, rule_raw, app_raw, coh_raw])
+
+        if uses_100:
+            q = max(0.0, min(100.0, q_raw))
+            rubric = {
+                "issue": max(0.0, min(100.0, issue_raw)),
+                "rule": max(0.0, min(100.0, rule_raw)),
+                "application": max(0.0, min(100.0, app_raw)),
+                "coherence": max(0.0, min(100.0, coh_raw)),
+            }
+        else:
+            q = _clamp01(q_raw)
+            rubric = {
+                "issue": _clamp01(issue_raw),
+                "rule": _clamp01(rule_raw),
+                "application": _clamp01(app_raw),
+                "coherence": _clamp01(coh_raw),
+            }
 
         verdict = str(obj.get("verdict", "unknown")).strip().lower()
         if verdict not in {"pass", "fail", "unknown"}:

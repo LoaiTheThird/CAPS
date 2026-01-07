@@ -1,7 +1,12 @@
 You must output ONLY valid JSON on a single line. No markdown. No code fences. No commentary.
 
-Return exactly this JSON schema:
-{{"q":<float 0..1>,"rubric":{{"issue":<float 0..1>,"rule":<float 0..1>,"application":<float 0..1>,"coherence":<float 0..1>}},"verdict":"pass|fail","notes":"<short>"}}
+Return exactly this JSON schema (INTEGERS 0..100):
+{{"q":<int 0..100>,"rubric":{{"issue":<int 0..100>,"rule":<int 0..100>,"application":<int 0..100>,"coherence":<int 0..100>}},"verdict":"pass|fail","notes":"<short>"}}
+
+Guidelines:
+- Use the full 0..100 range (not just 0/50/100).
+- 0 = completely wrong, 100 = perfect.
+- q should be close to the average of the four rubric fields.
 
 Scoring rubric:
 - issue: identifies the legal issue(s) correctly

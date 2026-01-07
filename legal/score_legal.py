@@ -122,8 +122,13 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    if args.overwrite and args.output.exists():
-        args.output.unlink()
+    # Ensure output directory exists and (optionally) clear output file immediately
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    if args.overwrite:
+        args.output.write_text("")  # create/clear file right away so wc -l works immediately
+    else:
+        if args.output.exists():
+            raise SystemExit(f"Output exists: {args.output}. Pass --overwrite to replace.")
 
     ex_rows = read_jsonl(args.examples)
     ex_by_id: Dict[str, LegalExample] = {}
@@ -177,11 +182,7 @@ def main() -> None:
             float(rub.get("application", 0.0)),
             float(rub.get("coherence", 0.0)),
         ]
-        q_rubric = clamp01(sum(vals) / 4.0)
-
-        # (Optional) still keep the model's self-reported q, but don't rely on it
-        # q_model = clamp01(jr.q)
-
+        q_rubric = clamp01((sum(vals) / 4.0) / 100.0)
         q = q_rubric
 
         # Mix correctness into q if available (keeps q continuous)
@@ -214,11 +215,12 @@ def main() -> None:
         out_batch.append(scored.model_dump())
         n_scored += 1
 
-        if len(out_batch) >= 200:
+        # Flush frequently so you see progress while Ollama judging is slow
+        if len(out_batch) >= 20:
             write_jsonl(args.output, out_batch)
             out_batch = []
-            if n_scored % 2000 == 0:
-                print(f"Scored {n_scored} candidates...")
+            if n_scored % 100 == 0:
+                print(f"Scored {n_scored} candidates...", flush=True)
 
     if out_batch:
         write_jsonl(args.output, out_batch)
