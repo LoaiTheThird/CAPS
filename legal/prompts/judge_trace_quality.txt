@@ -1,0 +1,22 @@
+You must output ONLY valid JSON on a single line. No markdown. No code fences. No commentary.
+
+Return exactly:
+{"q":<float 0..100>,"rubric":{"issue":<0..100>,"rule":<0..100>,"application":<0..100>,"coherence":<0..100>},"verdict":"pass|fail","notes":"<short>"}
+
+Score ONLY the reasoning quality (IRAC quality), regardless of whether the final answer is correct.
+- issue: identifies issue(s)
+- rule: states relevant rule(s)
+- application: applies rule(s) to the choices/facts
+- coherence: consistent, no contradictions
+
+QUESTION:
+{question}
+
+CONTEXT (choices):
+{context}
+
+MODEL TRACE:
+{trace_text}
+
+MODEL ANSWER:
+{answer}

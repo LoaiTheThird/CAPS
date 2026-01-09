@@ -1,0 +1,25 @@
+You must output ONLY valid JSON on a single line. No markdown. No code fences. No commentary.
+
+Return exactly:
+{"q":<float 0..100>,"rubric":{"supported":<0..100>,"contradictions":<0..100>,"choice_alignment":<0..100>,"missing_rule":<0..100>},"verdict":"pass|fail","notes":"<short>"}
+
+This time, score whether the reasoning SUPPORTS the chosen answer.
+- supported: is the final answer supported by the reasoning + question + choices?
+- contradictions: penalize internal contradictions (higher=better/no contradictions)
+- choice_alignment: did it compare the chosen option to others?
+- missing_rule: did it rely on missing legal rule?
+
+If the chosen option is not supported, q must be <= 20.
+If it is strongly supported, q can be >= 80.
+
+QUESTION:
+{question}
+
+CONTEXT (choices):
+{context}
+
+MODEL TRACE:
+{trace_text}
+
+MODEL ANSWER:
+{answer}

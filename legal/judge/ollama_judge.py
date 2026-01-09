@@ -34,23 +34,35 @@ def _clamp01(x: float) -> float:
 
 def _extract_json(text: str) -> Optional[Dict[str, Any]]:
     t = (text or "").strip()
-
-    # take first non-empty line
-    line = next((ln.strip() for ln in t.splitlines() if ln.strip()), "")
-    if not line:
+    t = t.replace("```json", "").replace("```", "").strip()
+    m = _JSON_RE.search(t)
+    if not m:
         return None
-
-    # remove any stray backticks if they appear
-    line = line.replace("```json", "").replace("```", "").strip()
-
-    # must start with '{'
-    if not line.startswith("{"):
-        return None
-
     try:
-        return json.loads(line)
+        return json.loads(m.group(0))
     except Exception:
         return None
+
+
+# def _extract_json(text: str) -> Optional[Dict[str, Any]]:
+#     t = (text or "").strip()
+#
+#     # take first non-empty line
+#     line = next((ln.strip() for ln in t.splitlines() if ln.strip()), "")
+#     if not line:
+#         return None
+#
+#     # remove any stray backticks if they appear
+#     line = line.replace("```json", "").replace("```", "").strip()
+#
+#     # must start with '{'
+#     if not line.startswith("{"):
+#         return None
+#
+#     try:
+#         return json.loads(line)
+#     except Exception:
+#         return None
 
 
 # Prev version:
@@ -124,6 +136,17 @@ def _safe_float(v: Any, default: float = 0.0) -> float:
         return default
 
 
+def fill_template(template: str, mapping: Dict[str, str]) -> str:
+    """
+    Safe template filling: only replaces {question}/{context}/{trace_text}/{answer}.
+    Leaves any other braces (e.g., JSON examples) untouched.
+    """
+    out = template
+    for k, v in mapping.items():
+        out = out.replace("{" + k + "}", v)
+    return out
+
+
 def judge_trace_with_ollama(
     *,
     question: str,
@@ -147,11 +170,14 @@ def judge_trace_with_ollama(
             "TRACE:\n{trace_text}\n\nANSWER: {answer}\n"
         )
 
-    prompt = template.format(
-        question=question,
-        context=(context or ""),
-        trace_text=trace_text,
-        answer=answer,
+    prompt = fill_template(
+        template,
+        {
+            "question": question,
+            "context": (context or ""),
+            "trace_text": trace_text,
+            "answer": answer,
+        },
     )
 
     last_raw = ""
