@@ -34,59 +34,22 @@ def _clamp01(x: float) -> float:
 
 def _extract_json(text: str) -> Optional[Dict[str, Any]]:
     t = (text or "").strip()
+    if not t:
+        return None
+
+    # remove code fences if present
     t = t.replace("```json", "").replace("```", "").strip()
-    m = _JSON_RE.search(t)
+
+    m = _JSON_RE.search(t)  # finds first {...} spanning multiple lines
     if not m:
         return None
+
+    candidate = m.group(0).strip()
     try:
-        return json.loads(m.group(0))
+        return json.loads(candidate)
     except Exception:
         return None
 
-
-# def _extract_json(text: str) -> Optional[Dict[str, Any]]:
-#     t = (text or "").strip()
-#
-#     # take first non-empty line
-#     line = next((ln.strip() for ln in t.splitlines() if ln.strip()), "")
-#     if not line:
-#         return None
-#
-#     # remove any stray backticks if they appear
-#     line = line.replace("```json", "").replace("```", "").strip()
-#
-#     # must start with '{'
-#     if not line.startswith("{"):
-#         return None
-#
-#     try:
-#         return json.loads(line)
-#     except Exception:
-#         return None
-
-
-# Prev version:
-# def call_ollama(prompt: str, model: str, timeout_s: int) -> str:
-#     cmd = [
-#         "ollama", "run", model,
-#         "-o", "temperature=0",
-#         "-o", "num_predict=256",
-#         "-o", "top_p=0.9",
-#         # stop tokens (best effort; some models still ignore)
-#         "-o", "stop=}\n",
-#         "-o", "stop=}\r\n",
-#     ]
-#
-#     proc = subprocess.run(
-#         cmd,
-#         input=prompt,
-#         text=True,
-#         capture_output=True,
-#         timeout=timeout_s,
-#     )
-#     if proc.returncode != 0:
-#         raise RuntimeError(f"Ollama failed (rc={proc.returncode}): {proc.stderr.strip()}")
-#     return proc.stdout.strip()
 
 
 def call_ollama(prompt: str, model: str, timeout_s: int) -> str:

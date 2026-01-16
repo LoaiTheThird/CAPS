@@ -135,50 +135,114 @@ def _infer_scale(vals: List[float]) -> float:
         return 1.0
     return 100.0
 
+#
+# def q_from_rubric(rubric: Dict[str, Any]) -> float:
+#     """
+#     Compute a stable continuous q in [0,1] from rubric fields.
+#
+#     Supports:
+#     - quality rubric: issue/rule/application/coherence (0..1 or 0..100)
+#     - correctness rubric: supported/contradictions/choice_alignment/missing_rule (0..1 or 0..100)
+#     - fallback: mean of all numeric rubric values
+#     """
+#     r = rubric or {}
+#     # prefer known sets of keys
+#     quality_keys = ["issue", "rule", "application", "coherence"]
+#     corr_keys = ["supported", "contradictions", "choice_alignment", "missing_rule"]
+#
+#     def pull(keys: List[str]) -> List[float]:
+#         out: List[float] = []
+#         for k in keys:
+#             if k in r:
+#                 out.append(_to_float(r.get(k, 0.0), 0.0))
+#         return out
+#
+#     vals = pull(quality_keys)
+#     if vals:
+#         scale = _infer_scale(vals)
+#         return clamp01(sum(vals) / (len(vals) * scale))
+#
+#     vals = pull(corr_keys)
+#     if vals:
+#         scale = _infer_scale(vals)
+#         return clamp01(sum(vals) / (len(vals) * scale))
+#
+#     # fallback: average all numeric rubric values
+#     all_vals: List[float] = []
+#     for v in r.values():
+#         fv = _to_float(v, None)  # type: ignore[arg-type]
+#         if fv is None:
+#             continue
+#         all_vals.append(fv)
+#     if not all_vals:
+#         return 0.0
+#     scale = _infer_scale(all_vals)
+#     return clamp01(sum(all_vals) / (len(all_vals) * scale))
+#
+def q_from_jr(jr) -> float:
+    q_raw = _to_float(getattr(jr, "q", 0.0), 0.0)
+    if q_raw > 1.5:  # assume 0..100
+        q_raw = q_raw / 100.0
+    return clamp01(q_raw)
+
 
 def q_from_rubric(rubric: Dict[str, Any]) -> float:
     """
-    Compute a stable continuous q in [0,1] from rubric fields.
+    Compute stable continuous q in [0,1] from rubric fields.
 
     Supports:
-    - quality rubric: issue/rule/application/coherence (0..1 or 0..100)
-    - correctness rubric: supported/contradictions/choice_alignment/missing_rule (0..1 or 0..100)
-    - fallback: mean of all numeric rubric values
+    - quality rubric (all positive): issue/rule/application/coherence
+    - correctness rubric (some negative): supported, choice_alignment (positive),
+      contradictions, missing_rule (negative -> invert)
     """
     r = rubric or {}
-    # prefer known sets of keys
+
+    # --- 1) quality rubric (all positive)
     quality_keys = ["issue", "rule", "application", "coherence"]
-    corr_keys = ["supported", "contradictions", "choice_alignment", "missing_rule"]
+    q_vals = []
+    for k in quality_keys:
+        if k in r:
+            q_vals.append(_to_float(r.get(k, 0.0), 0.0))
+    if q_vals:
+        scale = _infer_scale(q_vals)
+        return clamp01(sum(q_vals) / (len(q_vals) * scale))
 
-    def pull(keys: List[str]) -> List[float]:
-        out: List[float] = []
-        for k in keys:
-            if k in r:
-                out.append(_to_float(r.get(k, 0.0), 0.0))
-        return out
+    # --- 2) correctness rubric (mixed signs)
+    pos_keys = ["supported", "choice_alignment"]
+    neg_keys = ["contradictions", "missing_rule"]
 
-    vals = pull(quality_keys)
-    if vals:
+    pos = []
+    for k in pos_keys:
+        if k in r:
+            pos.append(_to_float(r.get(k, 0.0), 0.0))
+
+    neg = []
+    for k in neg_keys:
+        if k in r:
+            neg.append(_to_float(r.get(k, 0.0), 0.0))
+
+    if pos or neg:
+        vals = pos + neg
         scale = _infer_scale(vals)
-        return clamp01(sum(vals) / (len(vals) * scale))
 
-    vals = pull(corr_keys)
-    if vals:
-        scale = _infer_scale(vals)
-        return clamp01(sum(vals) / (len(vals) * scale))
+        pos_mean = (sum(pos) / (len(pos) * scale)) if pos else 0.0
+        neg_mean = (sum(neg) / (len(neg) * scale)) if neg else 0.0
 
-    # fallback: average all numeric rubric values
-    all_vals: List[float] = []
+        # Negatives reduce quality
+        q = 0.5 * pos_mean + 0.5 * (1.0 - neg_mean)
+        return clamp01(q)
+
+    # --- 3) fallback: average all numeric
+    all_vals = []
     for v in r.values():
-        fv = _to_float(v, None)  # type: ignore[arg-type]
-        if fv is None:
-            continue
-        all_vals.append(fv)
+        try:
+            all_vals.append(float(v))
+        except Exception:
+            pass
     if not all_vals:
         return 0.0
     scale = _infer_scale(all_vals)
     return clamp01(sum(all_vals) / (len(all_vals) * scale))
-
 
 def merge_rubrics_weighted(rubrics: List[Dict[str, Any]], weights: List[float]) -> Dict[str, float]:
     """
@@ -230,7 +294,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--ensemble_weights",
         type=str,
-        default="1.0,1.0",
+        default="0.7,0.3",
         help="Comma-separated weights matching --ensemble_templates.",
     )
 
@@ -336,7 +400,12 @@ def main() -> None:
                 timeout_s=args.timeout_s,
                 template_path=args.single_template,
             )
-            q = q_from_rubric(jr.rubric or {})
+            ##Single
+            # q = q_from_rubric(jr.rubric or {})
+            q_r = q_from_rubric(jr.rubric or {})
+            q_q = q_from_jr(jr)
+            q = clamp01(0.5 * q_r + 0.5 * q_q)
+            ##
             merged_rubric = jr.rubric
             judge_payload: Dict[str, Any] = {
                 "mode": "single",
@@ -364,8 +433,14 @@ def main() -> None:
                     template_path=tp,
                 )
                 member_results.append(jr_m)
-                rq = q_from_rubric(jr_m.rubric or {})
+                ##ensemble
+                # rq = q_from_rubric(jr_m.rubric or {})
+                # member_qs.append(rq)
+                q_r = q_from_rubric(jr_m.rubric or {})
+                q_q = q_from_jr(jr_m)
+                rq = clamp01(0.5 * q_r + 0.5 * q_q)
                 member_qs.append(rq)
+                ##
                 member_rubrics.append(jr_m.rubric or {})
                 member_notes.append((jr_m.notes or "").strip())
                 member_verdicts.append((jr_m.verdict or "unknown").strip())
