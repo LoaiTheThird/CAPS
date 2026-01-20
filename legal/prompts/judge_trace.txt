@@ -1,14 +1,22 @@
 You must output ONLY valid JSON on a single line. No markdown. No code fences. No commentary.
 
-Return exactly this JSON schema (INTEGERS 0..100):
-{{"q":<int 0..100>,"rubric":{{"issue":<int 0..100>,"rule":<int 0..100>,"application":<int 0..100>,"coherence":<int 0..100>}},"verdict":"pass|fail","notes":"<short>"}}
+Return exactly:
+{"q":<float 0..1>,"rubric":{"issue":<float 0..1>,"rule":<float 0..1>,"application":<float 0..1>,"coherence":<float 0..1>},"verdict":"pass|fail","notes":"<short>"}
 
-Guidelines:
-- Use the full 0..100 range (not just 0/50/100).
-- 0 = completely wrong, 100 = perfect.
-- q should be close to the average of the four rubric fields.
+Rules:
+- All numeric values must be floats in [0,1], NOT integers.
+- Use fine-grained decimals: choose values with 3 decimal places (e.g., 0.673).
+- Do NOT bucket scores. Specifically:
+  - Avoid multiples of 0.100 (0.1, 0.2, 0.3, ...).
+  - Avoid multiples of 0.050 (0.05, 0.10, 0.15, ...).
+  - Avoid exact 0.000 and 1.000 unless the case is truly extreme.
+- You MUST compute the four rubric values first.
+- Then you MUST set q = (issue + rule + application + coherence) / 4 exactly.
+- Set verdict = "pass" if q >= 0.5 else "fail".
+- If your JSON would violate any rule above, output q=0.0, verdict="fail", and notes="rule_violation".
 
-Scoring rubric:
+
+Score ONLY the reasoning quality (IRAC quality), regardless of whether the final answer is correct.
 - issue: identifies the legal issue(s) correctly
 - rule: states the relevant rule(s) correctly
 - application: applies the rule(s) to the facts/choices correctly

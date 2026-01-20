@@ -1,16 +1,28 @@
 You must output ONLY valid JSON on a single line. No markdown. No code fences. No commentary.
 
 Return exactly:
-{"q":<float 0..100>,"rubric":{"supported":<0..100>,"contradictions":<0..100>,"choice_alignment":<0..100>,"missing_rule":<0..100>},"verdict":"pass|fail","notes":"<short>"}
+{"q":<float 0..1>,"rubric":{"supported":<float 0..1>,"contradictions":<float 0..1>,"choice_alignment":<float 0..1>,"missing_rule":<float 0..1>},"verdict":"pass|fail","notes":"<short>"}
 
-This time, score whether the reasoning SUPPORTS the chosen answer.
-- supported: is the final answer supported by the reasoning + question + choices?
-- contradictions: penalize internal contradictions (higher=better/no contradictions)
-- choice_alignment: did it compare the chosen option to others?
-- missing_rule: did it rely on missing legal rule?
+Rules:
+- All numeric values must be floats in [0,1], NOT integers.
+- Use fine-grained decimals: choose values with 3 decimal places (e.g., 0.742).
+- Do NOT bucket scores. Specifically:
+  - Avoid multiples of 0.100 and 0.050.
+  - Avoid exact 0.000 and 1.000 unless truly extreme.
+- Hard constraint: q must equal (supported + contradictions + choice_alignment + missing_rule) / 4, within ±0.001.
+- Set verdict = "pass" if q >= 0.5 else "fail".
 
-If the chosen option is not supported, q must be <= 20.
-If it is strongly supported, q can be >= 80.
+
+Interpretation:
+- supported: reasoning + question + choices support the chosen answer (1.0 strong support)
+- contradictions: 1.0 means no contradictions, 0.0 means many contradictions
+- choice_alignment: compares chosen option against others
+- missing_rule: 1.0 means did NOT rely on missing legal rule, 0.0 means heavily relied on missing rule
+
+Hard constraints:
+- If the chosen option is NOT supported, then q MUST be <= 0.20.
+- If it is strongly supported, q SHOULD be >= 0.80.
+- Set q primarily by supported, then adjust slightly using the other rubric fields.
 
 QUESTION:
 {question}

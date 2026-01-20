@@ -402,9 +402,7 @@ def main() -> None:
             )
             ##Single
             # q = q_from_rubric(jr.rubric or {})
-            q_r = q_from_rubric(jr.rubric or {})
-            q_q = q_from_jr(jr)
-            q = clamp01(0.5 * q_r + 0.5 * q_q)
+            q = q_from_rubric(jr.rubric or {})
             ##
             merged_rubric = jr.rubric
             judge_payload: Dict[str, Any] = {
@@ -436,10 +434,7 @@ def main() -> None:
                 ##ensemble
                 # rq = q_from_rubric(jr_m.rubric or {})
                 # member_qs.append(rq)
-                q_r = q_from_rubric(jr_m.rubric or {})
-                q_q = q_from_jr(jr_m)
-                rq = clamp01(0.5 * q_r + 0.5 * q_q)
-                member_qs.append(rq)
+                member_qs.append(q_from_rubric(jr_m.rubric or {}))
                 ##
                 member_rubrics.append(jr_m.rubric or {})
                 member_notes.append((jr_m.notes or "").strip())

@@ -1,13 +1,28 @@
 You must output ONLY valid JSON on a single line. No markdown. No code fences. No commentary.
 
 Return exactly:
-{"q":<float 0..100>,"rubric":{"issue":<0..100>,"rule":<0..100>,"application":<0..100>,"coherence":<0..100>},"verdict":"pass|fail","notes":"<short>"}
+{"q":<float 0..1>,"rubric":{"issue":<float 0..1>,"rule":<float 0..1>,"application":<float 0..1>,"coherence":<float 0..1>},"verdict":"pass|fail","notes":"<short>"}
+
+Compute rubric values first, then set q = (issue + rule + application + coherence) / 4.
+
+Rules:
+- All numeric values must be floats in [0,1], NOT integers.
+- Use fine-grained decimals: choose values with 3 decimal places (e.g., 0.673).
+- Do NOT bucket scores. Specifically:
+  - Avoid multiples of 0.100 (0.1, 0.2, 0.3, ...).
+  - Avoid multiples of 0.050 (0.05, 0.10, 0.15, ...).
+  - Avoid exact 0.000 and 1.000 unless the case is truly extreme.
+- q must be the mean of the four rubric values, within ±0.005.
+- Hard constraint: q must equal (issue + rule + application + coherence) / 4, within ±0.001.
+- Set verdict = "pass" if q >= 0.5 else "fail".
+
+
 
 Score ONLY the reasoning quality (IRAC quality), regardless of whether the final answer is correct.
 - issue: identifies issue(s)
 - rule: states relevant rule(s)
 - application: applies rule(s) to the choices/facts
-- coherence: consistent, no contradictions
+- coherence: reasoning is internally consistent and not self-contradictory
 
 QUESTION:
 {question}

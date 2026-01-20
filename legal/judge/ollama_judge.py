@@ -63,7 +63,7 @@ def call_ollama(prompt: str, model: str, timeout_s: int) -> str:
         "prompt": prompt,
         "stream": False,
         "options": {
-            "temperature": 0.0,
+            "temperature": 0.2,
             "num_predict": 256,
             "top_p": 0.9,
             "stop": ["\n"],
@@ -182,12 +182,12 @@ def judge_trace_with_ollama(
         uses_100 = any(v > 1.0 for v in [q_raw, issue_raw, rule_raw, app_raw, coh_raw])
 
         if uses_100:
-            q = max(0.0, min(100.0, q_raw))
+            q = _clamp01(q_raw / 100.0)
             rubric = {
-                "issue": max(0.0, min(100.0, issue_raw)),
-                "rule": max(0.0, min(100.0, rule_raw)),
-                "application": max(0.0, min(100.0, app_raw)),
-                "coherence": max(0.0, min(100.0, coh_raw)),
+                "issue": _clamp01(issue_raw / 100.0),
+                "rule": _clamp01(rule_raw / 100.0),
+                "application": _clamp01(app_raw / 100.0),
+                "coherence": _clamp01(coh_raw / 100.0),
             }
         else:
             q = _clamp01(q_raw)
@@ -197,10 +197,14 @@ def judge_trace_with_ollama(
                 "application": _clamp01(app_raw),
                 "coherence": _clamp01(coh_raw),
             }
+        # --- Enforce q from rubric (ignore model-provided q if inconsistent) ---
+        # If we have the 4 IRAC keys, define q deterministically as their mean.
+        if all(k in rubric for k in ("issue", "rule", "application", "coherence")):
+            q = (rubric["issue"] + rubric["rule"] + rubric["application"] + rubric["coherence"]) / 4.0
+            q = _clamp01(q)
 
-        verdict = str(obj.get("verdict", "unknown")).strip().lower()
-        if verdict not in {"pass", "fail", "unknown"}:
-            verdict = "unknown"
+        verdict = "pass" if q >= 0.5 else "fail"
+
 
         notes = str(obj.get("notes", "")).strip()
 

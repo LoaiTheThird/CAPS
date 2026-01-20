@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 from pathlib import Path
 from typing import Optional, List, Dict
 
@@ -16,7 +17,7 @@ class EnsembleMember:
 
 
 def _norm_rubric(r: Dict[str, float]) -> Dict[str, float]:
-    # keep rubric in 0..100 space (as produced by judge)
+    # keep rubric numeric values as-is (judge may return 0..1 or 0..100)
     out = {}
     for k, v in (r or {}).items():
         try:
@@ -25,6 +26,22 @@ def _norm_rubric(r: Dict[str, float]) -> Dict[str, float]:
             out[k] = 0.0
     return out
 
+
+def _q01(v: Any) -> float:
+    """
+    Normalize q into [0,1]. Some prompts/judges may emit 0..100.
+    """
+    try:
+        x = float(v)
+    except Exception:
+        return 0.0
+    if x > 1.5:
+        x = x / 100.0
+    if x < 0.0:
+        return 0.0
+    if x > 1.0:
+        return 1.0
+    return x
 
 def judge_trace_ensemble_with_ollama(
     *,
@@ -60,7 +77,7 @@ def judge_trace_ensemble_with_ollama(
     # Weighted mean q (jr.q is 0..1)
     q = 0.0
     for m, jr in zip(members, results):
-        q += m.weight * float(jr.q)
+        q += m.weight * _q01(jr.q)
     q = q / wsum
 
     # Merge rubrics by averaging overlapping keys (keep 0..100 style values)
