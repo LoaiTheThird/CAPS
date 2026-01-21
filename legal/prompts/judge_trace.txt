@@ -1,26 +1,23 @@
 You must output ONLY valid JSON on a single line. No markdown. No code fences. No commentary.
 
 Return exactly:
-{"q":<float 0..1>,"rubric":{"issue":<float 0..1>,"rule":<float 0..1>,"application":<float 0..1>,"coherence":<float 0..1>},"verdict":"pass|fail","notes":"<short>"}
+{"rubric":{"issue":<int 0..100>,"rule":<int 0..100>,"application":<int 0..100>,"coherence":<int 0..100>},"notes":"<short>"}
 
 Rules:
-- All numeric values must be floats in [0,1], NOT integers.
-- Use fine-grained decimals: choose values with 3 decimal places (e.g., 0.673).
-- Do NOT bucket scores. Specifically:
-  - Avoid multiples of 0.100 (0.1, 0.2, 0.3, ...).
-  - Avoid multiples of 0.050 (0.05, 0.10, 0.15, ...).
-  - Avoid exact 0.000 and 1.000 unless the case is truly extreme.
-- You MUST compute the four rubric values first.
-- Then you MUST set q = (issue + rule + application + coherence) / 4 exactly.
-- Set verdict = "pass" if q >= 0.5 else "fail".
-- If your JSON would violate any rule above, output q=0.0, verdict="fail", and notes="rule_violation".
+- Output INTEGERS only (0..100). No decimals.
+- Use the full range (avoid only using a few common values).
+- Avoid multiples of 5 or 10 unless truly warranted.
+- Score ONLY reasoning quality (IRAC quality), regardless of whether the final answer is correct.
+- Score each dimension independently; do NOT pick four numbers and shuffle them across fields.
+- Do not default to a “template” set of numbers; base scores on this specific trace.
+- Unless the trace is truly extreme, avoid using 0 or 100.
 
 
-Score ONLY the reasoning quality (IRAC quality), regardless of whether the final answer is correct.
-- issue: identifies the legal issue(s) correctly
-- rule: states the relevant rule(s) correctly
-- application: applies the rule(s) to the facts/choices correctly
-- coherence: reasoning is internally consistent and not self-contradictory
+Calibration guidance:
+- Excellent IRAC should yield rubric values mostly in 75..95.
+- Mediocre IRAC should yield rubric values mostly in 40..65.
+- Poor IRAC should yield rubric values mostly in 5..35.
+
 
 QUESTION:
 {question}

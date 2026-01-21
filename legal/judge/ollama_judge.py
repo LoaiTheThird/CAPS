@@ -63,7 +63,7 @@ def call_ollama(prompt: str, model: str, timeout_s: int) -> str:
         "prompt": prompt,
         "stream": False,
         "options": {
-            "temperature": 0.2,
+            "temperature": 0.3,
             "num_predict": 256,
             "top_p": 0.9,
             "stop": ["\n"],
@@ -170,39 +170,32 @@ def judge_trace_with_ollama(
         if obj is None:
             continue
 
-        q_raw = _safe_float(obj.get("q", 0.0), 0.0)
+        rubric_in = obj.get("rubric", {}) or {}
+
         rubric_in = obj.get("rubric", {}) or {}
 
         issue_raw = _safe_float(rubric_in.get("issue", 0.0), 0.0)
-        rule_raw = _safe_float(rubric_in.get("rule", 0.0), 0.0)
-        app_raw = _safe_float(rubric_in.get("application", 0.0), 0.0)
-        coh_raw = _safe_float(rubric_in.get("coherence", 0.0), 0.0)
+        rule_raw  = _safe_float(rubric_in.get("rule", 0.0), 0.0)
+        app_raw   = _safe_float(rubric_in.get("application", 0.0), 0.0)
+        coh_raw   = _safe_float(rubric_in.get("coherence", 0.0), 0.0)
 
-        # If any value > 1, assume the judge is using 0..100 integers
-        uses_100 = any(v > 1.0 for v in [q_raw, issue_raw, rule_raw, app_raw, coh_raw])
+        # Expect rubric as 0..100 integers (or numeric). Clamp, then convert to 0..1 floats.
+        issue01 = _clamp01(max(0.0, min(100.0, issue_raw)) / 100.0)
+        rule01  = _clamp01(max(0.0, min(100.0, rule_raw)) / 100.0)
+        app01   = _clamp01(max(0.0, min(100.0, app_raw)) / 100.0)
+        coh01   = _clamp01(max(0.0, min(100.0, coh_raw)) / 100.0)
 
-        if uses_100:
-            q = _clamp01(q_raw / 100.0)
-            rubric = {
-                "issue": _clamp01(issue_raw / 100.0),
-                "rule": _clamp01(rule_raw / 100.0),
-                "application": _clamp01(app_raw / 100.0),
-                "coherence": _clamp01(coh_raw / 100.0),
-            }
-        else:
-            q = _clamp01(q_raw)
-            rubric = {
-                "issue": _clamp01(issue_raw),
-                "rule": _clamp01(rule_raw),
-                "application": _clamp01(app_raw),
-                "coherence": _clamp01(coh_raw),
-            }
-        # --- Enforce q from rubric (ignore model-provided q if inconsistent) ---
-        # If we have the 4 IRAC keys, define q deterministically as their mean.
-        if all(k in rubric for k in ("issue", "rule", "application", "coherence")):
-            q = (rubric["issue"] + rubric["rule"] + rubric["application"] + rubric["coherence"]) / 4.0
-            q = _clamp01(q)
+        rubric = {
+            "issue": issue01,
+            "rule": rule01,
+            "application": app01,
+            "coherence": coh01,
+        }
 
+        # Deterministic q from rubric
+        q = _clamp01((issue01 + rule01 + app01 + coh01) / 4.0)
+
+        # Deterministic verdict from q
         verdict = "pass" if q >= 0.5 else "fail"
 
 
