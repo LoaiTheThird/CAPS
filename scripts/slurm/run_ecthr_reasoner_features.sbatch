@@ -9,6 +9,7 @@
 # Common overrides:
 #   sbatch --export=ALL,ECTHR_SPLIT=validation,ECTHR_N_EXAMPLES=25 scripts/slurm/run_ecthr_reasoner_features.sbatch
 #   sbatch --export=ALL,ECTHR_SPLIT=test,LR_MAX_CANDIDATES=8 scripts/slurm/run_ecthr_reasoner_features.sbatch
+#   sbatch --export=ALL,ECTHR_SPLIT=validation,ECTHR_N_EXAMPLES=100,ECTHR_OUT=outputs/ecthr_b/pilot_top6_n100/reasoner_features_validation.jsonl,ECTHR_BASE_SCORES=outputs/ecthr_b/base_scores_validation.jsonl,LR_MAX_CANDIDATES=6 scripts/slurm/run_ecthr_reasoner_features.sbatch
 
 #SBATCH --job-name=ecthr-reasoner
 #SBATCH --output=slurm_logs/%x-%j.out
@@ -51,6 +52,10 @@ ECTHR_SPLIT="${ECTHR_SPLIT:-validation}"
 ECTHR_N_EXAMPLES="${ECTHR_N_EXAMPLES:-}"
 ECTHR_OFFSET="${ECTHR_OFFSET:-0}"
 ECTHR_OUT_DIR="${ECTHR_OUT_DIR:-outputs/ecthr_b}"
+ECTHR_OUT="${ECTHR_OUT:-}"
+ECTHR_CANDIDATE_SOURCE="${ECTHR_CANDIDATE_SOURCE:-base}"
+ECTHR_BASE_SCORES="${ECTHR_BASE_SCORES:-}"
+ECTHR_TOP_K="${ECTHR_TOP_K:-}"
 LR_MAX_CANDIDATES="${LR_MAX_CANDIDATES:-4}"
 LR_MAX_STEPS="${LR_MAX_STEPS:-4}"
 LR_MIN_VERIFIED_SUPPORT_STEPS="${LR_MIN_VERIFIED_SUPPORT_STEPS:-2}"
@@ -128,13 +133,26 @@ cmd=(
   --split "${ECTHR_SPLIT}"
   --offset "${ECTHR_OFFSET}"
   --out_dir "${ECTHR_OUT_DIR}"
+  --candidate_source "${ECTHR_CANDIDATE_SOURCE}"
   --max_candidates "${LR_MAX_CANDIDATES}"
   --max_steps "${LR_MAX_STEPS}"
   --min_verified_support_steps "${LR_MIN_VERIFIED_SUPPORT_STEPS}"
 )
 
+if [[ -n "${ECTHR_OUT}" ]]; then
+  cmd+=(--out "${ECTHR_OUT}")
+fi
+
 if [[ -n "${ECTHR_N_EXAMPLES}" ]]; then
   cmd+=(--n_examples "${ECTHR_N_EXAMPLES}")
+fi
+
+if [[ -n "${ECTHR_BASE_SCORES}" ]]; then
+  cmd+=(--base_scores "${ECTHR_BASE_SCORES}")
+fi
+
+if [[ -n "${ECTHR_TOP_K}" ]]; then
+  cmd+=(--top_k "${ECTHR_TOP_K}")
 fi
 
 echo "Running: ${cmd[*]}"

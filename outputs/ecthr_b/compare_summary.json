@@ -1,0 +1,34 @@
+{
+  "source": "outputs/ecthr_b/conformal_metrics.json",
+  "alpha": "0.1",
+  "mode": "global",
+  "rows": [
+    {
+      "method": "reasoner_only",
+      "coverage": 0.873,
+      "avg_set_size": 6.378,
+      "median_set_size": 6.0,
+      "micro_f1": 0.33252271854601306,
+      "macro_f1": 0.2756286645080641,
+      "micro_recall": 0.9052264808362369
+    },
+    {
+      "method": "base_only",
+      "coverage": 0.871,
+      "avg_set_size": 2.593,
+      "median_set_size": 2.0,
+      "micro_f1": 0.6405163853028798,
+      "macro_f1": 0.634754555575687,
+      "micro_recall": 0.8989547038327527
+    },
+    {
+      "method": "base_plus_reasoner",
+      "coverage": 0.871,
+      "avg_set_size": 2.636,
+      "median_set_size": 2.0,
+      "micro_f1": 0.6342422009334316,
+      "macro_f1": 0.6326287587372512,
+      "micro_recall": 0.8996515679442508
+    }
+  ]
+}

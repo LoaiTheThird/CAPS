@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 from tqdm import tqdm
 
 try:
-    from .ecthr_features import label_features_from_reasoner_record, write_jsonl
+    from .ecthr_features import label_features_from_reasoner_record, read_jsonl, write_jsonl
     from .gen_common import (
         DEFAULT_MAX_CASE_CHARS,
         VLLM_MODEL,
@@ -29,7 +29,7 @@ try:
         sanitize_verification_articles,
     )
 except ImportError:  # pragma: no cover
-    from ecthr_features import label_features_from_reasoner_record, write_jsonl
+    from ecthr_features import label_features_from_reasoner_record, read_jsonl, write_jsonl
     from gen_common import (
         DEFAULT_MAX_CASE_CHARS,
         VLLM_MODEL,
@@ -58,14 +58,71 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--offset", type=int, default=0)
     p.add_argument("--out_dir", type=Path, default=Path("outputs/ecthr_b"))
     p.add_argument("--out", type=Path, default=None)
+    p.add_argument(
+        "--candidate_source",
+        choices=["base", "llm"],
+        default="base",
+        help="Use top-K base classifier labels by default; use llm for the older LLM candidate stage.",
+    )
+    p.add_argument(
+        "--base_scores",
+        type=Path,
+        default=None,
+        help="JSONL base score file. Defaults to outputs/ecthr_b/base_scores_<split>.jsonl.",
+    )
+    p.add_argument(
+        "--top_k",
+        type=int,
+        default=None,
+        help="Number of base classifier labels to send to the reasoner. Defaults to --max_candidates.",
+    )
     p.add_argument("--max_candidates", type=int, default=4)
     p.add_argument("--max_steps", type=int, default=4)
     p.add_argument("--min_verified_support_steps", type=int, default=2)
     return p.parse_args()
 
 
+def load_base_scores_by_id(path: Path) -> Dict[int, Dict[str, Any]]:
+    rows = read_jsonl(path)
+    return {int(row["id"]): row for row in rows}
+
+
+def candidate_articles_from_base_scores(
+    *,
+    base_row: Dict[str, Any],
+    label_names: List[str],
+    top_k: int,
+) -> List[Dict[str, str]]:
+    scores = base_row.get("scores")
+    if not isinstance(scores, dict):
+        raise ValueError(f"Base score row {base_row.get('id')} is missing a scores object.")
+
+    ranked = sorted(
+        label_names,
+        key=lambda label: (-float(scores.get(label, 0.0)), label),
+    )
+    candidates = []
+    for rank, label in enumerate(ranked[: max(0, min(top_k, len(ranked)))]):
+        prob = float(scores.get(label, 0.0))
+        candidates.append(
+            {
+                "label": label,
+                "reason": f"Base classifier rank {rank + 1} with probability {prob:.4f}.",
+            }
+        )
+    return candidates
+
+
 def main() -> None:
     args = parse_args()
+    candidate_limit = (
+        args.top_k
+        if args.candidate_source == "base" and args.top_k is not None
+        else args.max_candidates
+    )
+    if candidate_limit <= 0:
+        raise ValueError("Candidate limit must be positive.")
+
     load_n = None if args.n_examples is None else args.offset + args.n_examples
     ds, label_names = load_split(args.split, load_n)
     examples = list(ds)[args.offset:]
@@ -75,15 +132,36 @@ def main() -> None:
     out = args.out or (args.out_dir / f"reasoner_features_{args.split}.jsonl")
     rows: List[Dict[str, Any]] = []
 
-    candidate_schema = get_candidate_schema(label_names, max_candidates=args.max_candidates)
+    base_scores_path = args.base_scores or (args.out_dir / f"base_scores_{args.split}.jsonl")
+    base_scores_by_id: Dict[int, Dict[str, Any]] = {}
+    if args.candidate_source == "base":
+        if not base_scores_path.exists():
+            raise FileNotFoundError(
+                f"Base score file not found: {base_scores_path}. "
+                "Run legal.run_ecthr_base_scores first or pass --base_scores."
+            )
+        base_scores_by_id = load_base_scores_by_id(base_scores_path)
+        missing_ids = [
+            case_id
+            for case_id in range(args.offset, args.offset + len(examples))
+            if case_id not in base_scores_by_id
+        ]
+        if missing_ids:
+            preview = ", ".join(str(case_id) for case_id in missing_ids[:10])
+            raise ValueError(
+                f"Base score file {base_scores_path} is missing {len(missing_ids)} "
+                f"requested case ids. First missing ids: {preview}"
+            )
+
+    candidate_schema = get_candidate_schema(label_names, max_candidates=candidate_limit)
     reasoning_schema = get_legalreasoner_reasoning_schema(
         label_names,
-        max_candidates=args.max_candidates,
+        max_candidates=candidate_limit,
         max_steps=args.max_steps,
     )
     verification_schema = get_legalreasoner_verification_schema(
         label_names,
-        max_candidates=args.max_candidates,
+        max_candidates=candidate_limit,
         max_steps=args.max_steps,
     )
 
@@ -100,15 +178,25 @@ def main() -> None:
         stage_error = None
 
         try:
-            candidate_response = call_vllm_chat_legalreasoner(
-                build_candidate_prompt(case_text, label_names, max_candidates=args.max_candidates),
-                candidate_schema,
-            )
-            candidate_articles = sanitize_candidates(
-                candidate_response.get("candidates", []),
-                label_names,
-                max_candidates=args.max_candidates,
-            )
+            if args.candidate_source == "base":
+                base_row = base_scores_by_id.get(idx)
+                if base_row is None:
+                    raise KeyError(f"No base score row found for case id {idx}.")
+                candidate_articles = candidate_articles_from_base_scores(
+                    base_row=base_row,
+                    label_names=label_names,
+                    top_k=candidate_limit,
+                )
+            else:
+                candidate_response = call_vllm_chat_legalreasoner(
+                    build_candidate_prompt(case_text, label_names, max_candidates=candidate_limit),
+                    candidate_schema,
+                )
+                candidate_articles = sanitize_candidates(
+                    candidate_response.get("candidates", []),
+                    label_names,
+                    max_candidates=candidate_limit,
+                )
             candidate_labels = [item["label"] for item in candidate_articles]
 
             if candidate_labels:
@@ -117,7 +205,7 @@ def main() -> None:
                         case_text,
                         candidate_articles,
                         label_names,
-                        max_candidates=args.max_candidates,
+                        max_candidates=candidate_limit,
                         max_steps=args.max_steps,
                     ),
                     reasoning_schema,
@@ -135,7 +223,7 @@ def main() -> None:
                         case_text,
                         reasoning_articles,
                         label_names,
-                        max_candidates=args.max_candidates,
+                        max_candidates=candidate_limit,
                         max_steps=args.max_steps,
                     ),
                     verification_schema,
@@ -179,7 +267,10 @@ def main() -> None:
                 "case_chars": len(case_text),
                 "provider": "vllm",
                 "model": VLLM_MODEL,
-                "max_candidates": args.max_candidates,
+                "candidate_source": args.candidate_source,
+                "base_scores_path": str(base_scores_path) if args.candidate_source == "base" else None,
+                "top_k": candidate_limit if args.candidate_source == "base" else None,
+                "max_candidates": candidate_limit,
                 "max_steps": args.max_steps,
                 "min_verified_support_steps": args.min_verified_support_steps,
             }
@@ -187,6 +278,20 @@ def main() -> None:
 
     write_jsonl(out, rows)
     print(f"Wrote {len(rows)} rows to {out}")
+    n_errors = sum(1 for row in rows if row.get("error"))
+    n_reasoning = sum(1 for row in rows if row.get("reasoning_articles"))
+    n_verification = sum(1 for row in rows if row.get("verification_articles"))
+    print(
+        "Reasoner summary: "
+        f"errors={n_errors}/{len(rows)}, "
+        f"reasoning_nonempty={n_reasoning}/{len(rows)}, "
+        f"verification_nonempty={n_verification}/{len(rows)}"
+    )
+    if rows and n_errors == len(rows):
+        raise SystemExit(
+            "All examples failed during LegalReasoner feature generation. "
+            "Check that the vLLM/OpenAI-compatible server is running and VLLM_BASE_URL is correct."
+        )
 
 
 if __name__ == "__main__":

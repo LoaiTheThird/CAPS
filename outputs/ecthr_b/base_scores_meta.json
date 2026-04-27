@@ -1,0 +1,18 @@
+{
+  "model": "tfidf_ovr_logreg",
+  "label_names": [
+    "2",
+    "3",
+    "5",
+    "6",
+    "8",
+    "9",
+    "10",
+    "11",
+    "14",
+    "P1-1"
+  ],
+  "max_features": 200000,
+  "crossfit_train": true,
+  "folds": 5
+}

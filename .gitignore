@@ -29,7 +29,5 @@ data/entailmentbank_raw/
 # Any derived EB splits you create
 data/eb_task1_dev_*.jsonl
 
-# All experiment outputs (candidates, scores, sets, metrics, etc.)
-outputs/
 
 data/lexam_repo/

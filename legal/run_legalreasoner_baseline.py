@@ -5,27 +5,50 @@ from typing import Any, Dict, List
 
 from tqdm import tqdm
 
-from gen_common import (
-    DEFAULT_MAX_CASE_CHARS,
-    DEFAULT_N_EXAMPLES,
-    VLLM_MODEL,
-    build_case_text,
-    build_label_guardrails,
-    build_label_legend,
-    call_vllm_chat_direct,
-    call_vllm_chat_legalreasoner,
-    compute_metrics,
-    get_candidate_schema,
-    get_label_schema,
-    get_legalreasoner_reasoning_schema,
-    get_legalreasoner_verification_schema,
-    label_for_prompt,
-    labels_from_verified_supports,
-    load_split,
-    sanitize_predicted_labels,
-    to_multihot_from_ids,
-    to_multihot_from_names,
-)
+try:
+    from .gen_common import (
+        DEFAULT_MAX_CASE_CHARS,
+        DEFAULT_N_EXAMPLES,
+        VLLM_MODEL,
+        build_case_text,
+        build_label_guardrails,
+        build_label_legend,
+        call_vllm_chat_direct,
+        call_vllm_chat_legalreasoner,
+        compute_metrics,
+        get_candidate_schema,
+        get_label_schema,
+        get_legalreasoner_reasoning_schema,
+        get_legalreasoner_verification_schema,
+        label_for_prompt,
+        labels_from_verified_supports,
+        load_split,
+        sanitize_predicted_labels,
+        to_multihot_from_ids,
+        to_multihot_from_names,
+    )
+except ImportError:  # pragma: no cover - allows running as python legal/foo.py
+    from gen_common import (
+        DEFAULT_MAX_CASE_CHARS,
+        DEFAULT_N_EXAMPLES,
+        VLLM_MODEL,
+        build_case_text,
+        build_label_guardrails,
+        build_label_legend,
+        call_vllm_chat_direct,
+        call_vllm_chat_legalreasoner,
+        compute_metrics,
+        get_candidate_schema,
+        get_label_schema,
+        get_legalreasoner_reasoning_schema,
+        get_legalreasoner_verification_schema,
+        label_for_prompt,
+        labels_from_verified_supports,
+        load_split,
+        sanitize_predicted_labels,
+        to_multihot_from_ids,
+        to_multihot_from_names,
+    )
 
 N_EXAMPLES = DEFAULT_N_EXAMPLES
 MAX_CANDIDATES = max(1, int(os.environ.get("LR_MAX_CANDIDATES", "4")))
