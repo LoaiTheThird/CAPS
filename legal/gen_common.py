@@ -60,6 +60,17 @@ LABEL_NEGATIVE_RULES = {
 
 
 def load_split(split: str | int = "test", n_examples: int | None = None):
+    """
+    Load a LexGLUE ECtHR-B split.
+
+    Standard split names for this experiment are:
+    - train: supervised scorer/meta-scorer training
+    - validation: conformal calibration
+    - test: final evaluation
+
+    The older load_split(N) form is kept for run_legalreasoner_baseline.py
+    and means "first N examples from test".
+    """
     from datasets import load_dataset
 
     # Backwards-compatible form used by older scripts:
@@ -67,6 +78,10 @@ def load_split(split: str | int = "test", n_examples: int | None = None):
     if isinstance(split, int):
         n_examples = split
         split = "test"
+
+    split = str(split).strip().lower()
+    if split == "dev":
+        split = "validation"
 
     ds = load_dataset("coastalcph/lex_glue", DATASET_CONFIG)
     label_names = ds["train"].features["labels"].feature.names
