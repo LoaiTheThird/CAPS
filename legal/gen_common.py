@@ -59,13 +59,24 @@ LABEL_NEGATIVE_RULES = {
 }
 
 
-def load_split(n_examples: int):
+def load_split(split: str | int = "test", n_examples: int | None = None):
     from datasets import load_dataset
+
+    # Backwards-compatible form used by older scripts:
+    #   load_split(1000) -> first 1000 examples from test
+    if isinstance(split, int):
+        n_examples = split
+        split = "test"
 
     ds = load_dataset("coastalcph/lex_glue", DATASET_CONFIG)
     label_names = ds["train"].features["labels"].feature.names
-    test_ds = ds["test"].select(range(n_examples))
-    return test_ds, label_names
+    if split not in ds:
+        raise ValueError(f"Split {split!r} not found. Available: {list(ds.keys())}")
+
+    out = ds[split]
+    if n_examples is not None:
+        out = out.select(range(min(int(n_examples), len(out))))
+    return out, label_names
 
 
 def to_multihot_from_ids(label_ids: List[int], num_labels: int) -> List[int]:

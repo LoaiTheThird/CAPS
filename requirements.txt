@@ -1,6 +1,11 @@
 clingo
+datasets
+joblib
+numpy
 pydantic[dotenv]
 orjson
+requests
+scikit-learn
 vllm
 torch
 tqdm
