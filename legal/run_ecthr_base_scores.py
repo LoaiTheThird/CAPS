@@ -1,5 +1,22 @@
 from __future__ import annotations
 
+"""
+Train a cheap, reproducible ECtHR-B legal label scorer.
+
+Model:
+- TfidfVectorizer over build_case_text(ex["text"])
+- OneVsRestClassifier(LogisticRegression)
+
+Output:
+One JSONL row per case, e.g.
+{
+  "id": 123,
+  "split": "test",
+  "gold_labels": ["3", "6"],
+  "scores": {"2": 0.03, "3": 0.71, "5": 0.12}
+}
+"""
+
 import argparse
 import json
 from pathlib import Path
@@ -20,7 +37,13 @@ except ImportError:  # pragma: no cover
     from ecthr_features import write_jsonl
 
 
+def normalize_split(split: str) -> str:
+    split = split.strip().lower()
+    return "validation" if split == "dev" else split
+
+
 def build_xy(split: str, n_examples: int | None) -> Tuple[List[str], np.ndarray, List[Dict[str, Any]], List[str]]:
+    split = normalize_split(split)
     ds, label_names = load_split(split, n_examples)
     texts: List[str] = []
     y_rows: List[List[int]] = []
@@ -115,7 +138,8 @@ def rows_from_scores(
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Train a TF-IDF legal classifier and emit ECtHR-B per-label scores.")
     p.add_argument("--out_dir", type=Path, default=Path("outputs/ecthr_b"))
-    p.add_argument("--splits", default="train,validation,test")
+    p.add_argument("--splits", default="train,validation,test",
+                   help="Comma-separated splits to score. Use train,validation,test; dev aliases to validation.")
     p.add_argument("--n_train", type=int, default=None)
     p.add_argument("--n_eval", type=int, default=None)
     p.add_argument("--max_features", type=int, default=200_000)
@@ -137,7 +161,7 @@ def main() -> None:
     args.model_out.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump({"vectorizer": vectorizer, "classifier": clf, "label_names": label_names}, args.model_out)
 
-    splits = [s.strip() for s in args.splits.split(",") if s.strip()]
+    splits = [normalize_split(s) for s in args.splits.split(",") if s.strip()]
     for split in splits:
         if split == "train":
             if args.crossfit_train:
