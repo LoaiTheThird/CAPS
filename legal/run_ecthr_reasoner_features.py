@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Sequence, Tuple
 
 from tqdm import tqdm
 
@@ -59,6 +59,26 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--out_dir", type=Path, default=Path("outputs/ecthr_b"))
     p.add_argument("--out", type=Path, default=None)
     p.add_argument(
+        "--ids",
+        default=None,
+        help="Comma-separated case ids to run, e.g. 4,17,25. Overrides --offset/--n_examples selection.",
+    )
+    p.add_argument(
+        "--ids_file",
+        type=Path,
+        default=None,
+        help="Text file with one case id per line, or comma-separated ids.",
+    )
+    p.add_argument(
+        "--failed_from",
+        type=Path,
+        default=None,
+        help=(
+            "Existing reasoner JSONL. Rerun rows with errors or incomplete "
+            "candidate/reasoning/verification stages."
+        ),
+    )
+    p.add_argument(
         "--candidate_source",
         choices=["base", "llm"],
         default="base",
@@ -80,6 +100,51 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max_steps", type=int, default=4)
     p.add_argument("--min_verified_support_steps", type=int, default=2)
     return p.parse_args()
+
+
+def parse_case_ids(value: str | None) -> List[int]:
+    if not value:
+        return []
+    ids: List[int] = []
+    for part in value.replace("\n", ",").split(","):
+        part = part.strip()
+        if not part or part.startswith("#"):
+            continue
+        ids.append(int(part))
+    return ids
+
+
+def read_case_ids_file(path: Path | None) -> List[int]:
+    if path is None:
+        return []
+    return parse_case_ids(path.read_text(encoding="utf-8"))
+
+
+def record_needs_rerun(row: Dict[str, Any]) -> bool:
+    if row.get("error"):
+        return True
+
+    candidate_articles = row.get("candidate_articles") or []
+    reasoning_articles = row.get("reasoning_articles") or []
+    verification_articles = row.get("verification_articles") or []
+
+    if len(reasoning_articles) < len(candidate_articles):
+        return True
+    if len(verification_articles) < len(reasoning_articles):
+        return True
+
+    return False
+
+
+def failed_case_ids(path: Path | None) -> List[int]:
+    if path is None:
+        return []
+    rows = read_jsonl(path)
+    return [int(row["id"]) for row in rows if record_needs_rerun(row)]
+
+
+def unique_sorted_ids(ids: Sequence[int]) -> List[int]:
+    return sorted(dict.fromkeys(int(case_id) for case_id in ids))
 
 
 def load_base_scores_by_id(path: Path) -> Dict[int, Dict[str, Any]]:
@@ -123,13 +188,44 @@ def main() -> None:
     if candidate_limit <= 0:
         raise ValueError("Candidate limit must be positive.")
 
-    load_n = None if args.n_examples is None else args.offset + args.n_examples
-    ds, label_names = load_split(args.split, load_n)
-    examples = list(ds)[args.offset:]
-    if args.n_examples is not None:
-        examples = examples[: args.n_examples]
+    selected_ids = unique_sorted_ids(
+        [
+            *parse_case_ids(args.ids),
+            *read_case_ids_file(args.ids_file),
+            *failed_case_ids(args.failed_from),
+        ]
+    )
+    subset_mode = bool(args.ids or args.ids_file or args.failed_from)
 
-    out = args.out or (args.out_dir / f"reasoner_features_{args.split}.jsonl")
+    if selected_ids:
+        load_n = max(selected_ids) + 1
+    elif subset_mode:
+        load_n = 0
+    else:
+        load_n = None if args.n_examples is None else args.offset + args.n_examples
+
+    ds, label_names = load_split(args.split, load_n)
+    if selected_ids:
+        examples: List[Tuple[int, Dict[str, Any]]] = [
+            (case_id, ds[int(case_id)])
+            for case_id in selected_ids
+        ]
+    elif subset_mode:
+        examples = []
+    else:
+        raw_examples = list(ds)[args.offset:]
+        if args.n_examples is not None:
+            raw_examples = raw_examples[: args.n_examples]
+        examples = [
+            (args.offset + local_idx, ex)
+            for local_idx, ex in enumerate(raw_examples)
+        ]
+
+    out = args.out or (
+        args.out_dir / f"reasoner_features_{args.split}_rerun.jsonl"
+        if subset_mode
+        else args.out_dir / f"reasoner_features_{args.split}.jsonl"
+    )
     rows: List[Dict[str, Any]] = []
 
     base_scores_path = args.base_scores or (args.out_dir / f"base_scores_{args.split}.jsonl")
@@ -141,11 +237,8 @@ def main() -> None:
                 "Run legal.run_ecthr_base_scores first or pass --base_scores."
             )
         base_scores_by_id = load_base_scores_by_id(base_scores_path)
-        missing_ids = [
-            case_id
-            for case_id in range(args.offset, args.offset + len(examples))
-            if case_id not in base_scores_by_id
-        ]
+        requested_ids = [case_id for case_id, _ex in examples]
+        missing_ids = [case_id for case_id in requested_ids if case_id not in base_scores_by_id]
         if missing_ids:
             preview = ", ".join(str(case_id) for case_id in missing_ids[:10])
             raise ValueError(
@@ -165,8 +258,10 @@ def main() -> None:
         max_steps=args.max_steps,
     )
 
-    for local_idx, ex in enumerate(tqdm(examples, desc=f"Reasoner features ({args.split})")):
-        idx = args.offset + local_idx
+    if subset_mode:
+        print(f"Selected {len(examples)} case ids for rerun/subset output: {out}")
+
+    for idx, ex in tqdm(examples, desc=f"Reasoner features ({args.split})"):
         case_text = build_case_text(ex["text"], max_chars=DEFAULT_MAX_CASE_CHARS)
         gold_ids = [int(i) for i in ex["labels"]]
         gold_labels = [label_names[i] for i in gold_ids]
