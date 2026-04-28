@@ -18,7 +18,71 @@ except ImportError:  # pragma: no cover
     from ecthr_features import read_jsonl, write_jsonl
 
 
-METHODS = ("base_only", "reasoner_only", "base_plus_reasoner")
+RANK_FEATURES = (
+    "candidate_present",
+    "candidate_rank",
+    "candidate_rank_norm",
+)
+
+PRELIM_FEATURES = (
+    *RANK_FEATURES,
+    "prelim_support",
+    "prelim_weak",
+    "prelim_none",
+    "n_reasoning_steps",
+)
+
+VERDICT_FEATURES = (
+    *RANK_FEATURES,
+    "verdict_supported",
+    "verdict_partial",
+    "verdict_unsupported",
+    "hard_support_gate",
+)
+
+STEP_FEATURES = (
+    *RANK_FEATURES,
+    "n_step_checks",
+    "n_supported_steps",
+    "n_partial_steps",
+    "n_unsupported_steps",
+    "supported_fraction",
+    "partial_fraction",
+    "unsupported_fraction",
+)
+
+METHOD_FEATURES = {
+    "base_only": ("base_prob",),
+    "reasoner_only": None,
+    "base_plus_reasoner": None,
+    "base_rank": ("base_prob", *RANK_FEATURES),
+    "base_prelim": ("base_prob", *PRELIM_FEATURES),
+    "base_verdict": ("base_prob", *VERDICT_FEATURES),
+    "base_step_counts": ("base_prob", *STEP_FEATURES),
+    "base_full_no_rank": (
+        "base_prob",
+        "candidate_reason_chars",
+        "prelim_support",
+        "prelim_weak",
+        "prelim_none",
+        "n_reasoning_steps",
+        "verdict_supported",
+        "verdict_partial",
+        "verdict_unsupported",
+        "label_evidence_chars",
+        "n_step_checks",
+        "n_supported_steps",
+        "n_partial_steps",
+        "n_unsupported_steps",
+        "supported_fraction",
+        "partial_fraction",
+        "unsupported_fraction",
+        "hard_support_gate",
+    ),
+}
+
+METHODS = tuple(METHOD_FEATURES.keys())
+DEFAULT_METHODS = ("base_only", "reasoner_only", "base_plus_reasoner")
 
 
 def feature_dict(row: Dict[str, Any], method: str) -> Dict[str, Any]:
@@ -34,6 +98,9 @@ def feature_dict(row: Dict[str, Any], method: str) -> Dict[str, Any]:
     elif method == "base_plus_reasoner":
         for key, value in features.items():
             out[key] = float(value)
+    elif method in METHOD_FEATURES:
+        for key in METHOD_FEATURES[method] or ():
+            out[key] = float(features.get(key, 0.0))
     else:
         raise ValueError(f"Unknown method: {method}")
 
@@ -98,7 +165,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--out_dir", type=Path, default=Path("outputs/ecthr_b"))
     p.add_argument("--train_table", type=Path, default=None)
     p.add_argument("--predict_splits", default="validation,test")
-    p.add_argument("--methods", default=",".join(METHODS))
+    p.add_argument(
+        "--methods",
+        default=",".join(DEFAULT_METHODS),
+        help=f"Comma-separated methods. Available: {','.join(METHODS)}",
+    )
     p.add_argument("--model_dir", type=Path, default=Path("outputs/ecthr_b/models"))
     return p.parse_args()
 

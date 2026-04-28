@@ -54,6 +54,7 @@ ECTHR_N_EXAMPLES="${ECTHR_N_EXAMPLES:-}"
 ECTHR_OFFSET="${ECTHR_OFFSET:-0}"
 ECTHR_OUT_DIR="${ECTHR_OUT_DIR:-outputs/ecthr_b}"
 ECTHR_OUT="${ECTHR_OUT:-}"
+ECTHR_MAX_CASE_CHARS="${ECTHR_MAX_CASE_CHARS:-${MAX_CASE_CHARS:-}}"
 ECTHR_CANDIDATE_SOURCE="${ECTHR_CANDIDATE_SOURCE:-base}"
 ECTHR_BASE_SCORES="${ECTHR_BASE_SCORES:-}"
 ECTHR_TOP_K="${ECTHR_TOP_K:-}"
@@ -142,6 +143,10 @@ cmd=(
   --max_steps "${LR_MAX_STEPS}"
   --min_verified_support_steps "${LR_MIN_VERIFIED_SUPPORT_STEPS}"
 )
+
+if [[ -n "${ECTHR_MAX_CASE_CHARS}" ]]; then
+  cmd+=(--max_case_chars "${ECTHR_MAX_CASE_CHARS}")
+fi
 
 if [[ -n "${ECTHR_OUT}" ]]; then
   cmd+=(--out "${ECTHR_OUT}")

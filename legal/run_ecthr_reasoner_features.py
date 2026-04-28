@@ -59,6 +59,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--out_dir", type=Path, default=Path("outputs/ecthr_b"))
     p.add_argument("--out", type=Path, default=None)
     p.add_argument(
+        "--max_case_chars",
+        default=None,
+        help=(
+            "Maximum case-text characters sent to the LLM. Use an integer, "
+            "or full/none/0 for no truncation. Defaults to MAX_CASE_CHARS env."
+        ),
+    )
+    p.add_argument(
         "--ids",
         default=None,
         help="Comma-separated case ids to run, e.g. 4,17,25. Overrides --offset/--n_examples selection.",
@@ -100,6 +108,18 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max_steps", type=int, default=4)
     p.add_argument("--min_verified_support_steps", type=int, default=2)
     return p.parse_args()
+
+
+def parse_max_case_chars(value: str | int | None) -> int | None:
+    if value is None:
+        return DEFAULT_MAX_CASE_CHARS
+    if isinstance(value, int):
+        return None if value <= 0 else value
+
+    cleaned = str(value).strip().lower()
+    if cleaned in {"", "0", "-1", "none", "full"}:
+        return None
+    return int(cleaned)
 
 
 def parse_case_ids(value: str | None) -> List[int]:
@@ -180,6 +200,7 @@ def candidate_articles_from_base_scores(
 
 def main() -> None:
     args = parse_args()
+    max_case_chars = parse_max_case_chars(args.max_case_chars)
     candidate_limit = (
         args.top_k
         if args.candidate_source == "base" and args.top_k is not None
@@ -262,7 +283,7 @@ def main() -> None:
         print(f"Selected {len(examples)} case ids for rerun/subset output: {out}")
 
     for idx, ex in tqdm(examples, desc=f"Reasoner features ({args.split})"):
-        case_text = build_case_text(ex["text"], max_chars=DEFAULT_MAX_CASE_CHARS)
+        case_text = build_case_text(ex["text"], max_chars=max_case_chars)
         gold_ids = [int(i) for i in ex["labels"]]
         gold_labels = [label_names[i] for i in gold_ids]
 
@@ -362,6 +383,7 @@ def main() -> None:
                 "case_chars": len(case_text),
                 "provider": "vllm",
                 "model": VLLM_MODEL,
+                "max_case_chars": max_case_chars,
                 "candidate_source": args.candidate_source,
                 "base_scores_path": str(base_scores_path) if args.candidate_source == "base" else None,
                 "top_k": candidate_limit if args.candidate_source == "base" else None,
