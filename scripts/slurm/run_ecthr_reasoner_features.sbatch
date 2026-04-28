@@ -35,6 +35,9 @@ VENV_PATH="${VENV_PATH:-.venv}"
 if [[ -f "${VENV_PATH}/bin/activate" ]]; then
   # shellcheck disable=SC1090
   source "${VENV_PATH}/bin/activate"
+  echo "Activated virtualenv: ${VENV_PATH}"
+else
+  echo "WARNING: virtualenv not found at ${VENV_PATH}; using module/default Python."
 fi
 
 export PYTHONPATH="${PYTHONPATH:-$PWD}"
@@ -85,6 +88,13 @@ pwd
 echo "Python:"
 which python
 python --version
+
+if ! command -v vllm >/dev/null 2>&1 && ! python -c "import vllm" >/dev/null 2>&1; then
+  echo "ERROR: vLLM is not available in this Python environment."
+  echo "Current python: $(which python)"
+  echo "Set VENV_PATH to a virtualenv that has vllm installed, or install vllm in the active environment."
+  exit 1
+fi
 
 echo "GPU:"
 nvidia-smi
