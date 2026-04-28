@@ -15,7 +15,7 @@
 #SBATCH --job-name=ecthr-reasoner
 #SBATCH --output=slurm_logs/%x-%j.out
 #SBATCH --error=slurm_logs/%x-%j.err
-#SBATCH --time=24:00:00
+#SBATCH --time=35:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G

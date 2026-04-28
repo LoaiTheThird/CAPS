@@ -6,10 +6,10 @@
     {
       "method": "base_plus_reasoner",
       "coverage": 0.91,
-      "avg_set_size": 2.31,
+      "avg_set_size": 2.27,
       "median_set_size": 2.0,
-      "micro_f1": 0.6885245901639344,
-      "macro_f1": 0.7027031491152129,
+      "micro_f1": 0.6961325966850829,
+      "macro_f1": 0.7058418138540807,
       "micro_recall": 0.9333333333333333
     },
     {
@@ -23,12 +23,12 @@
     },
     {
       "method": "reasoner_only",
-      "coverage": 0.89,
-      "avg_set_size": 2.63,
-      "median_set_size": 3.0,
-      "micro_f1": 0.6231155778894473,
-      "macro_f1": 0.6240193557177479,
-      "micro_recall": 0.9185185185185185
+      "coverage": 0.87,
+      "avg_set_size": 2.56,
+      "median_set_size": 2.0,
+      "micro_f1": 0.618925831202046,
+      "macro_f1": 0.6081603994382899,
+      "micro_recall": 0.8962962962962963
     }
   ]
 }

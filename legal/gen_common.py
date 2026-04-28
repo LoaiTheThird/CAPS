@@ -774,9 +774,9 @@ def call_vllm_chat_legalreasoner(prompt: str, schema: Dict[str, Any]) -> Dict[st
     return call_vllm_chat(
         prompt=prompt,
         schema=schema,
-        max_tokens=384,
+        max_tokens=min(768, VLLM_MAX_OUTPUT_TOKENS),
         timeout=1200,
-        max_retries=2,
+        max_retries=3,
     )
 
 
