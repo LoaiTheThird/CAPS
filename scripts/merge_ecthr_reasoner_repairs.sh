@@ -12,6 +12,7 @@
 set -euo pipefail
 
 ECTHR_OUT_DIR="${ECTHR_OUT_DIR:-outputs/ecthr_b}"
+export ECTHR_OUT_DIR
 REPAIR_TAG="${1:-repair_next}"
 
 for split in train validation test; do
@@ -33,11 +34,12 @@ for split in train validation test; do
 done
 
 python - <<'PY'
+import os
 from pathlib import Path
 from legal.run_ecthr_reasoner_features import failed_case_ids
 
 for split in ["train", "validation", "test"]:
-    path = Path("outputs/ecthr_b") / f"reasoner_features_{split}.jsonl"
+    path = Path(os.environ["ECTHR_OUT_DIR"]) / f"reasoner_features_{split}.jsonl"
     if path.exists():
         ids = failed_case_ids(path)
         print(f"{split}: {len(ids)} remaining incomplete rows {ids[:50]}")

@@ -33,18 +33,27 @@ def build_rows_for_split(
     elif reasoner_path and not allow_missing_reasoner:
         raise FileNotFoundError(reasoner_path)
 
+    if restrict_to_reasoner_cases and not reasoner_by_id:
+        raise ValueError(
+            f"{split}: --restrict_to_reasoner_cases requires a non-empty reasoner file."
+        )
+
     base_ids = {int(row["id"]) for row in base_rows}
     if reasoner_by_id:
         missing_reasoner_ids = sorted(base_ids - set(reasoner_by_id))
         if missing_reasoner_ids:
             msg = (
                 f"{split}: reasoner features cover {len(reasoner_by_id)}/{len(base_ids)} "
-                f"base cases; {len(missing_reasoner_ids)} cases will use default reasoner features."
+                f"base cases."
             )
             if require_complete_reasoner:
                 preview = ", ".join(str(case_id) for case_id in missing_reasoner_ids[:10])
                 raise ValueError(f"{msg} First missing ids: {preview}")
-            print(f"[WARN] {msg}")
+            if not restrict_to_reasoner_cases:
+                print(
+                    f"[WARN] {msg} {len(missing_reasoner_ids)} cases will use "
+                    "default reasoner features."
+                )
 
     default_features = default_reasoner_features(label_names)
     rows: List[Dict[str, Any]] = []

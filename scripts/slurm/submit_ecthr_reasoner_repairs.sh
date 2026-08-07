@@ -31,6 +31,7 @@ for split in train validation test; do
 
   export_args=(
     "ALL"
+    "ECTHR_OUT_DIR=${ECTHR_OUT_DIR}"
     "ECTHR_SPLIT=${split}"
     "ECTHR_FAILED_FROM=${base}"
     "ECTHR_OUT=${out}"

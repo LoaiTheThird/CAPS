@@ -136,8 +136,15 @@ def grouped_score_rows(
     *,
     method: str,
 ) -> List[Dict[str, Any]]:
+    score_values = list(scores)
+    if len(rows) != len(score_values):
+        raise ValueError(
+            f"Expected one score per feature row, got {len(score_values)} scores "
+            f"for {len(rows)} rows."
+        )
+
     by_id: Dict[int, Dict[str, Any]] = {}
-    for row, score in zip(rows, scores):
+    for row, score in zip(rows, score_values):
         case_id = int(row["id"])
         rec = by_id.setdefault(
             case_id,
@@ -170,18 +177,24 @@ def parse_args() -> argparse.Namespace:
         default=",".join(DEFAULT_METHODS),
         help=f"Comma-separated methods. Available: {','.join(METHODS)}",
     )
-    p.add_argument("--model_dir", type=Path, default=Path("outputs/ecthr_b/models"))
+    p.add_argument(
+        "--model_dir",
+        type=Path,
+        default=None,
+        help="Model directory. Defaults to <out_dir>/models.",
+    )
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     train_table = args.train_table or (args.out_dir / "feature_table_train.jsonl")
+    model_dir = args.model_dir or (args.out_dir / "models")
     train_rows = read_jsonl(train_table)
     methods = [m.strip() for m in args.methods.split(",") if m.strip()]
     predict_splits = [s.strip() for s in args.predict_splits.split(",") if s.strip()]
 
-    args.model_dir.mkdir(parents=True, exist_ok=True)
+    model_dir.mkdir(parents=True, exist_ok=True)
     meta: Dict[str, Any] = {"methods": {}, "train_table": str(train_table)}
 
     for method in methods:
@@ -189,7 +202,7 @@ def main() -> None:
             raise ValueError(f"Unknown method {method!r}; expected one of {METHODS}")
 
         model = train_model(train_rows, method)
-        model_path = args.model_dir / f"{method}.joblib"
+        model_path = model_dir / f"{method}.joblib"
         joblib.dump(model, model_path)
         meta["methods"][method] = {"model_path": str(model_path)}
 

@@ -121,6 +121,16 @@ def rows_from_scores(
     label_names: List[str],
     scores: np.ndarray,
 ) -> List[Dict[str, Any]]:
+    if len(meta) != len(scores):
+        raise ValueError(
+            f"Expected one score row per case, got {len(scores)} scores for {len(meta)} cases."
+        )
+    if scores.ndim != 2 or scores.shape[1] != len(label_names):
+        raise ValueError(
+            "Score matrix must have one column per label, "
+            f"got shape {scores.shape} for {len(label_names)} labels."
+        )
+
     rows = []
     for rec, score_row in zip(meta, scores):
         rows.append(
@@ -146,20 +156,26 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--crossfit_train", action="store_true", help="Emit out-of-fold train scores for meta-scorer training.")
     p.add_argument("--folds", type=int, default=5)
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--model_out", type=Path, default=Path("outputs/ecthr_b/base_tfidf_ovr.joblib"))
+    p.add_argument(
+        "--model_out",
+        type=Path,
+        default=None,
+        help="Model path. Defaults to <out_dir>/base_tfidf_ovr.joblib.",
+    )
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    model_out = args.model_out or (args.out_dir / "base_tfidf_ovr.joblib")
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     train_texts, train_y, train_meta, label_names = build_xy("train", args.n_train)
     vectorizer, clf = make_model(args.max_features)
     x_train = vectorizer.fit_transform(train_texts)
     clf.fit(x_train, train_y)
-    args.model_out.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"vectorizer": vectorizer, "classifier": clf, "label_names": label_names}, args.model_out)
+    model_out.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump({"vectorizer": vectorizer, "classifier": clf, "label_names": label_names}, model_out)
 
     splits = [normalize_split(s) for s in args.splits.split(",") if s.strip()]
     for split in splits:
@@ -194,7 +210,7 @@ def main() -> None:
         "folds": args.folds if args.crossfit_train else None,
     }
     (args.out_dir / "base_scores_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    print(f"Saved model to {args.model_out}")
+    print(f"Saved model to {model_out}")
 
 
 if __name__ == "__main__":

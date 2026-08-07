@@ -68,8 +68,8 @@ def load_split(split: str | int = "test", n_examples: int | None = None):
     - validation: conformal calibration
     - test: final evaluation
 
-    The older load_split(N) form is kept for run_legalreasoner_baseline.py
-    and means "first N examples from test".
+    The older load_split(N) form is kept for the archived direct baseline and
+    means "first N examples from test".
     """
     from datasets import load_dataset
 

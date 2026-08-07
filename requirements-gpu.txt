@@ -1,0 +1,4 @@
+-r requirements.txt
+
+torch>=2.4
+vllm>=0.6

@@ -27,6 +27,12 @@ def parse_alphas(value: str) -> List[float]:
 
 
 def rows_to_metric_arrays(rows: List[Dict[str, Any]], label_names: List[str], predicted_sets: List[List[str]]):
+    if len(rows) != len(predicted_sets):
+        raise ValueError(
+            f"Expected one prediction set per case, got {len(predicted_sets)} sets "
+            f"for {len(rows)} cases."
+        )
+
     label_to_idx = {label: i for i, label in enumerate(label_names)}
     y_true = np.zeros((len(rows), len(label_names)), dtype=int)
     y_pred = np.zeros((len(rows), len(label_names)), dtype=int)
@@ -45,6 +51,12 @@ def evaluate_sets(
     label_names: List[str],
     predicted_sets: List[List[str]],
 ) -> Dict[str, Any]:
+    if len(rows) != len(predicted_sets):
+        raise ValueError(
+            f"Expected one prediction set per case, got {len(predicted_sets)} sets "
+            f"for {len(rows)} cases."
+        )
+
     covered = [
         set_covers_gold(pred, row.get("gold_labels", []))
         for row, pred in zip(rows, predicted_sets)
@@ -87,12 +99,18 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--alphas", default="0.05,0.1,0.2")
     p.add_argument("--calib_split", default="validation")
     p.add_argument("--test_split", default="test")
-    p.add_argument("--out", type=Path, default=Path("outputs/ecthr_b/conformal_metrics.json"))
+    p.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Metrics path. Defaults to <out_dir>/conformal_metrics.json.",
+    )
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    out = args.out or (args.out_dir / "conformal_metrics.json")
     methods = [m.strip() for m in args.methods.split(",") if m.strip()]
     alphas = parse_alphas(args.alphas)
     report: Dict[str, Any] = {
@@ -134,9 +152,9 @@ def main() -> None:
 
         report["methods"][method] = method_report
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(f"Wrote {args.out}")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(f"Wrote {out}")
     for method, method_report in report["methods"].items():
         row = method_report["global"].get("0.1") or next(iter(method_report["global"].values()))
         print(

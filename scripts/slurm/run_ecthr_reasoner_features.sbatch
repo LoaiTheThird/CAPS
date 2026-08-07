@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Start a vLLM OpenAI-compatible server inside this Slurm allocation, wait until
-# it is ready, then run Step 3 feature generation against localhost.
+# it is ready, then run evidence feature generation against localhost.
 #
 # Submit from the repository root:
 #   sbatch scripts/slurm/run_ecthr_reasoner_features.sbatch
@@ -68,7 +68,7 @@ LR_MAX_CANDIDATES="${LR_MAX_CANDIDATES:-4}"
 LR_MAX_STEPS="${LR_MAX_STEPS:-4}"
 LR_MIN_VERIFIED_SUPPORT_STEPS="${LR_MIN_VERIFIED_SUPPORT_STEPS:-2}"
 
-VLLM_LOG_DIR="${VLLM_LOG_DIR:-outputs/ecthr_b/logs}"
+VLLM_LOG_DIR="${VLLM_LOG_DIR:-${ECTHR_OUT_DIR}/logs}"
 mkdir -p "${VLLM_LOG_DIR}"
 VLLM_LOG="${VLLM_LOG_DIR}/vllm-${SLURM_JOB_ID:-local}.log"
 

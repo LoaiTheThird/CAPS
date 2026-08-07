@@ -11,11 +11,11 @@ def fmt(x: float, nd: int = 3) -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Print a compact paper-style ECtHR conformal comparison table.")
-    p.add_argument("--metrics", type=Path, default=Path("outputs/ecthr_b/conformal_metrics.json"))
+    p = argparse.ArgumentParser(description="Print a compact ECtHR conformal comparison table.")
+    p.add_argument("--metrics", type=Path, default=Path("results/ecthr_b/metrics.json"))
     p.add_argument("--alpha", default="0.1")
     p.add_argument("--mode", choices=["global", "labelwise"], default="global")
-    p.add_argument("--out", type=Path, default=Path("outputs/ecthr_b/compare_summary.json"))
+    p.add_argument("--out", type=Path, default=None, help="Optional path for the JSON summary.")
     return p.parse_args()
 
 
@@ -45,8 +45,9 @@ def main() -> None:
         "mode": args.mode,
         "rows": rows,
     }
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     print(f"ECtHR-B conformal comparison ({args.mode}, alpha={args.alpha})")
     print("Method                  Coverage   Avg |C|   Med |C|   Micro-F1   Macro-F1   Micro-R")
@@ -61,7 +62,8 @@ def main() -> None:
             f"{fmt(row['macro_f1']):>11s}"
             f"{fmt(row['micro_recall']):>10s}"
         )
-    print(f"Wrote {args.out}")
+    if args.out is not None:
+        print(f"Wrote {args.out}")
 
 
 if __name__ == "__main__":
