@@ -82,8 +82,4 @@ See [`docs/reproduction.md`](docs/reproduction.md) for the complete pipeline and
 - Reasoner model: [Qwen2.5-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct) served through vLLM
 - Calibration split: the official ECtHR-B validation split
 
-This is research code and is not legal advice.
 
-## License
-
-MIT
